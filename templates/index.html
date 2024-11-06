@@ -13,6 +13,13 @@
             box-shadow: 0px 0px 10px rgba(0,0,0,0.1);
         }
 
+        .top-bar {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
         .container {
             display: flex;
             flex-direction: row;
@@ -53,7 +60,7 @@
 
         .book img {
             max-width: 100%; /* Ensure image fits within the book item */
-            height: auto;
+            height: auto; /* Maintain aspect ratio */
         }
 
         .book h3 {
@@ -69,14 +76,57 @@
         button {
             margin-right: 5px;
         }
+
+        /* 반응형 디자인 - 모바일 최적화 */
+        @media screen and (max-width: 768px) {
+            .container {
+                flex-direction: column; /* 모바일에서는 세로로 정렬 */
+                gap: 10px; /* 간격 조정 */
+            }
+
+            .book {
+                width: 150px; /* 모바일에서 썸네일 크기 줄이기 */
+                padding: 8px; /* 패딩 조정 */
+                box-shadow: none; /* 그림자 제거로 간결하게 */
+                border-radius: 5px; /* 모서리 둥글게 처리 */
+                border-color:#ccc; 
+                background-color:#f9f9f9; 
+                transition:.3s ease-in-out all; 
+                text-align:center
+             }
+             
+             .book:hover{border-color:#aaa;background-color:#fff;}
+
+             .book img {
+                 max-width:100%; 
+                 height:auto
+             }
+             
+             .book h3{
+                 font-size:.9rem
+             }
+             
+             .book p{
+                 font-size:.75rem
+             }
+         }
     </style>
 </head>
 <body>
     <h1>책마루</h1>
-    <form id="searchForm">
-        <input type="text" name="keyword" placeholder="검색어를 입력하세요" required>
-        <button type="submit">검색</button>
-    </form>
+
+    <!-- 검색 폼과 버튼을 한 줄로 배치 -->
+    <div class="top-bar">
+        <form id="searchForm" style="display:flex;">
+            <input type="text" name="keyword" placeholder="검색어를 입력하세요" required>
+            <button type="submit">검색</button>
+        </form>
+
+        <!-- 검색 버튼 오른쪽에 나머지 버튼 배치 -->
+        <button type="button" id="viewContents">목차 보기</button>
+        <button type="button" id="saveText">목차 텍스트로 저장</button>
+        <button type="button" id="createNote">독서노트 생성</button>
+    </div>
 
     <div class="container">
         <div id="results" class="search-results"></div>
@@ -86,10 +136,6 @@
             <div id="contentsDisplay"></div>
         </div>
     </div>
-
-    <button type="button" id="viewContents">목차 보기</button>
-    <button type="button" id="saveText">목차 텍스트로 저장</button>
-    <button type="button" id="createNote">독서노트 생성</button>
 
     <script>
         let selectedBookUrl;
@@ -172,23 +218,60 @@
             .catch(error => console.error('Error:', error));
         });
 
-        document.getElementById('saveText').addEventListener('click', function() {
-            
+        // 목차 텍스트 다운로드 기능
+        document.getElementById('saveText').addEventListener('click', function() {            
 fetch('/view_contents', { method:'POST', headers:{'Content-Type':'application/json'}, body:
 JSON.stringify({ url:selectedBookUrl }) }).then(response=>response.json()).then(data=>{
 if(data.error){ alert(data.error); return; }
-fetch('/save_text',{method:'POST',headers:{'Content-Type':'application/json'},body:
-JSON.stringify({ contents:data.contents,title:selectedBookTitle })}).then(response=>
-response.json()).then(data=>alert(data.message)).catch(error=>console.error('Error:',error));
+
+// 브라우저에서 파일 다운로드 처리
+const blob = new Blob([data.contents], { type:'text/plain' });
+const link = document.createElement('a');
+link.href = URL.createObjectURL(blob);
+link.download = `${selectedBookTitle}_목차.txt`;
+document.body.appendChild(link);
+link.click();
+document.body.removeChild(link);
+
 }).catch(error=>console.error('Error:',error)); });
 
+
+// 독서노트 생성 및 다운로드 기능
 document.getElementById('createNote').addEventListener('click',function(){
 if(!selectedBookUrl||!selectedBookTitle){alert("독서노트를 생성할 도서를 선택하세요.");return;}
 fetch('/view_contents',{method:'POST',headers:{'Content-Type':'application/json'},body:
 JSON.stringify({url:selectedBookUrl})}).then(response=>response.json()).then(data=>{
 if(data.error){alert(data.error);return;}
-fetch('/create_note',{method:'POST',headers:{'Content-Type':'application/json'},body:
-JSON.stringify({contents:data.contents,title:selectedBookTitle,author:selectedBookAuthor,
-publisher:selectedBookPublisher})}).then(response=>response.json()).then(data=>
-alert(data.message)).catch(error=>console.error('Error:',error));}).catch(error=>
-console.error('Error:',error));}); </script> </body> </html>
+
+const currentTime = new Date().toLocaleString();
+const readingNoteTemplate = `
+=== 독서노트 ===
+작성일 : ${currentTime}
+[도서 정보]
+제목 : ${selectedBookTitle}
+저자 : ${selectedBookAuthor}
+출판사 : ${selectedBookPublisher}
+
+[목차 정보]
+${data.contents}
+
+[독서 메모]
+- 주요 내용:
+- 인상 깊은 구절:
+- 나의 생각:
+- 실천할 점:
+`;
+
+// 브라우저에서 파일 다운로드 처리
+const blob = new Blob([readingNoteTemplate], { type:'text/plain' });
+const link = document.createElement('a');
+link.href = URL.createObjectURL(blob);
+link.download = `${selectedBookTitle}_독서노트.txt`;
+document.body.appendChild(link);
+link.click();
+document.body.removeChild(link);
+
+}).catch(error=>console.error('Error:',error));});
+    </script>
+</body>
+</html>
