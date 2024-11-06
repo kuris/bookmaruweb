@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>책마루</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: auto;
+            padding: 20px;
+            box-shadow: 0px 0px 10px rgba(0,0,0,0.1);
+        }
+
+        .container {
+            display: flex;
+            flex-direction: row;
+            gap: 20px;
+        }
+
+        .search-results {
+            flex: 2;
+            max-height: 700px;
+            overflow-y: auto;
+            border: 1px solid #ccc;
+            padding: 10px;
+        }
+
+        .contents {
+            flex: 1;
+            max-height: 700px;
+            overflow-y: auto;
+            border: 1px solid #ccc;
+            padding: 10px;
+        }
+
+        #results {
+            display: flex; /* Flexbox for horizontal layout */
+            flex-wrap: wrap; /* Allows wrapping if items overflow */
+            gap: 20px; /* Adds space between items */
+        }
+
+        .book {
+            display: flex;
+            flex-direction: column; /* Stack book details vertically */
+            align-items: center; /* Center-align content */
+            width: 200px; /* Set a fixed width for each book item */
+            border: 1px solid #ddd;
+            padding: 10px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+
+        .book img {
+            max-width: 100%; /* Ensure image fits within the book item */
+            height: auto;
+        }
+
+        .book h3 {
+            font-size: 16px;
+            margin-top: 10px;
+        }
+
+        .book p {
+            font-size: 14px;
+            margin-top: 5px;
+        }
+
+        button {
+            margin-right: 5px;
+        }
+    </style>
+</head>
+<body>
+    <h1>책마루</h1>
+    <form id="searchForm">
+        <input type="text" name="keyword" placeholder="검색어를 입력하세요" required>
+        <button type="submit">검색</button>
+    </form>
+
+    <div class="container">
+        <div id="results" class="search-results"></div>
+
+        <div id="contents" class="contents">
+            <h2>목차</h2>
+            <div id="contentsDisplay"></div>
+        </div>
+    </div>
+
+    <button type="button" id="viewContents">목차 보기</button>
+    <button type="button" id="saveText">목차 텍스트로 저장</button>
+    <button type="button" id="createNote">독서노트 생성</button>
+
+    <script>
+        let selectedBookUrl;
+        let selectedBookTitle;
+        let selectedBookAuthor;
+        let selectedBookPublisher;
+
+        document.getElementById('searchForm').addEventListener('submit', function(event) {
+            event.preventDefault();
+            const formData = new FormData(this);
+            
+            fetch('/search', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                const resultsDiv = document.getElementById('results');
+                resultsDiv.innerHTML = '';
+                
+                if (data.error) {
+                    resultsDiv.innerHTML = `<p>${data.error}</p>`;
+                    return;
+                }
+                
+                data.books.forEach((book, index) => {
+                    const bookDiv = document.createElement('div');
+                    bookDiv.classList.add('book');
+                    
+                    bookDiv.innerHTML =
+                        `<input type="radio" name="selectedBook" value="${index}" id="book${index}">
+                        <label for="book${index}">
+                            <img src="${book.image_url}" alt="${book.title}">
+                            <h3>${book.title}</h3>
+                            <p>저자: ${book.author}</p>
+                            <p>출판사: ${book.publisher}</p>
+                            <p>가격: ${book.price}</p>
+                        </label>`;
+                    
+                    resultsDiv.appendChild(bookDiv);
+                });
+
+                // Add event listeners to radio buttons
+                document.querySelectorAll('input[name="selectedBook"]').forEach(radio => {
+                    radio.addEventListener('change', function() {
+                        const bookIndex = this.value;
+                        selectedBookUrl = data.books[bookIndex].url;
+                        selectedBookTitle = data.books[bookIndex].title;
+                        selectedBookAuthor = data.books[bookIndex].author;
+                        selectedBookPublisher = data.books[bookIndex].publisher;
+                    });
+                });
+                
+            })
+            .catch(error => console.error('Error:', error));
+        });
+
+        document.getElementById('viewContents').addEventListener('click', function() {
+            if (!selectedBookUrl) {
+                alert("목차를 보려면 도서를 선택하세요.");
+                return;
+            }
+
+            fetch('/view_contents', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ url: selectedBookUrl })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.error) {
+                    alert(data.error);
+                    return;
+                }
+                
+                // Display contents in the right panel
+                document.getElementById('contentsDisplay').innerText = data.contents || "목차 정보가 없습니다.";
+                
+            })
+            .catch(error => console.error('Error:', error));
+        });
+
+        document.getElementById('saveText').addEventListener('click', function() {
+            
+fetch('/view_contents', { method:'POST', headers:{'Content-Type':'application/json'}, body:
+JSON.stringify({ url:selectedBookUrl }) }).then(response=>response.json()).then(data=>{
+if(data.error){ alert(data.error); return; }
+fetch('/save_text',{method:'POST',headers:{'Content-Type':'application/json'},body:
+JSON.stringify({ contents:data.contents,title:selectedBookTitle })}).then(response=>
+response.json()).then(data=>alert(data.message)).catch(error=>console.error('Error:',error));
+}).catch(error=>console.error('Error:',error)); });
+
+document.getElementById('createNote').addEventListener('click',function(){
+if(!selectedBookUrl||!selectedBookTitle){alert("독서노트를 생성할 도서를 선택하세요.");return;}
+fetch('/view_contents',{method:'POST',headers:{'Content-Type':'application/json'},body:
+JSON.stringify({url:selectedBookUrl})}).then(response=>response.json()).then(data=>{
+if(data.error){alert(data.error);return;}
+fetch('/create_note',{method:'POST',headers:{'Content-Type':'application/json'},body:
+JSON.stringify({contents:data.contents,title:selectedBookTitle,author:selectedBookAuthor,
+publisher:selectedBookPublisher})}).then(response=>response.json()).then(data=>
+alert(data.message)).catch(error=>console.error('Error:',error));}).catch(error=>
+console.error('Error:',error));}); </script> </body> </html>
